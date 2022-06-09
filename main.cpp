@@ -26,6 +26,7 @@
 #include <TGraph.h>
 #include <TH1.h>
 #include <TH2.h>
+#include <THStack.h>
 #include <TLeaf.h>
 #include <TList.h>
 #include <TMath.h>
@@ -53,6 +54,11 @@
 #include "Track.h"
 
 using namespace std;
+
+Double_t gaus(Double_t x, Double_t mean, Double_t sigma){
+  Double_t toReturn = x * TMath::Exp(-0.5 * TMath::Power((x - mean) / sigma, 2));
+  return toReturn;
+}
 
 void Analysis(Int_t run_number, Short_t nBoards = 1)
 {
@@ -103,32 +109,17 @@ void Analysis(Int_t run_number, Short_t nBoards = 1)
   printf("EventTime Set Branch = %i\n", ResultSetBranch);
   ResultSetBranch = -1;
 
-  // TCanvas *c = nullptr;
-  // Short_t nPads = 2;
-  // std::vector<TPad *> Pads(nPads);
-  // if (fDRAW) {
-  //   cout << "nPads = " << nPads << endl;
-  //   c = new TCanvas("c", "The Canvas", 0, 0, 1440, 1000);
-  //   // Pads = ConfigurePads(Pads, "vertical");
-  // }
-
   Int_t ReadBytes = -1;
   Int_t entriesReadTOF = 0;
   Int_t entriesReadTrack = 0;
 
-  // TGraph* grTOF = new TGraph();
-  // TGraph* grTrack = new TGraph();
 
-  Double_t xTOF[100], yTOF[100];
-  Double_t xTrack[100], yTrack[100];
+  Double_t xTOFTemp[100], yTOFTemp[100];
+  Double_t xTrackTemp[100], yTrackTemp[100];
 
   Double_t xSub[6624], ySub[6624];
-
-  // TString FileToWriteName = "/home/facecerep/diplom/histo.root";
-  // TFile f(FileToWriteName, "RECREATE");
-  // cout << "file created at: " << FileToWriteName << endl;
-  // auto T = new TTree("T", "test");
-  // T->Branch("graph", &hSub, 10000, 0);
+  Double_t xTOF[6624], yTOF[6624];
+  Double_t xTrack[6624], yTrack[6624];
 
   Int_t xMinimum = 0.99;
   Int_t xMaximum = 0.99;
@@ -137,7 +128,7 @@ void Analysis(Int_t run_number, Short_t nBoards = 1)
 
   Int_t pointsTotal = 0;
 
-  for (Int_t iEv = 0; iEv < nEvForRead / 2; iEv++)
+  for (Int_t iEv = 0; iEv < nEvForRead; iEv++)
   {
     ReadBytes = eveTree->GetEntry(iEv);
 
@@ -147,16 +138,16 @@ void Analysis(Int_t run_number, Short_t nBoards = 1)
     for (Int_t iDig = 0; iDig < TOF_digi->GetEntriesFast(); iDig++)
     {
       BmnTOF1Conteiner *digi = (BmnTOF1Conteiner *)TOF_digi->At(iDig);
-      xTOF[iDig] = digi->GetX();
-      yTOF[iDig] = digi->GetY();
+      xTOFTemp[iDig] = digi->GetX();
+      yTOFTemp[iDig] = digi->GetY();
       entriesReadTOF++;
     }
 
     for (Int_t iDig = 0; iDig < Tracks_digi->GetEntriesFast(); iDig++)
     {
       Track *digi = (Track *)Tracks_digi->At(iDig);
-      xTrack[iDig] = digi->GetfStopPointX();
-      yTrack[iDig] = digi->GetfStopPointY();
+      xTrackTemp[iDig] = digi->GetfStopPointX();
+      yTrackTemp[iDig] = digi->GetfStopPointY();
       entriesReadTrack++;
     }
 
@@ -171,58 +162,68 @@ void Analysis(Int_t run_number, Short_t nBoards = 1)
 
       for (Int_t i = 0; i < minimumEntriesRead; i++)
       {
-        xSub[pointsTotal] = xTrack[i] - xTOF[i];
-        ySub[pointsTotal] = yTrack[i] - yTOF[i];
+        //if(xTrack[i] - xTOF[i] < 100 && xTrack[i] - xTOF[i] > -350){
+          Double_t x = xTrackTemp[i] - xTOFTemp[i];
+          Double_t y = yTrackTemp[i] - yTOFTemp[i];
+          xSub[pointsTotal] = x;
+          ySub[pointsTotal] = y;
 
-        // if(xSub[pointsTotal] < xMinimum)
-        //   xMinimum = xSub[pointsTotal];
-        // if(xSub[pointsTotal] > xMaximum)
-        //   xMaximum = xSub[pointsTotal];
-        // if(ySub[pointsTotal] < yMinimum)
-        //   yMinimum = ySub[pointsTotal];
-        // if(ySub[pointsTotal] > yMaximum)
-        //   yMaximum = ySub[pointsTotal];
+          xTOF[pointsTotal] = xTOFTemp[i];
+          yTOF[pointsTotal] = yTOFTemp[i];
+          xTrack[pointsTotal] = xTrackTemp[i];
+          yTrack[pointsTotal] = yTrackTemp[i];
 
-        pointsTotal++;
+          if(x < xMinimum)
+            xMinimum = x;
+          if(x > xMaximum)
+            xMaximum = x;
+          if(y < yMinimum)
+            yMinimum = y;
+          if(y > yMaximum)
+            yMaximum = y;
+
+          pointsTotal++;
+        //}
+
+        //if(!xSub[pointsTotal] > 100)
       }
     }
-
-    // mg = new TMultiGraph();
 
     // cout << "Enrties read track: " << entriesReadTrack << endl;
     // cout << "Entries read TOF: " << entriesReadTOF << endl;
     // cout << "Entries read: " << minimumEntriesRead << endl;
-
-    //grSub->Draw("AP");
-
-    // T->Fill();
-    // T->Print();
-    // f.Write();
-    // c->Update();
-
-    // this_thread::sleep_for(chrono::milliseconds(100));
   }
-  // cout << "xMinimum: " << xMinimum << endl;
-  // cout << "xMaximum: " << xMaximum << endl;
-  // cout << "yMinimum: " << yMinimum << endl;
-  // cout << "yMaximum: " << yMaximum << endl;
+  cout << "xMinimum: " << xMinimum << endl;
+  cout << "xMaximum: " << xMaximum << endl;
+  cout << "yMinimum: " << yMinimum << endl;
+  cout << "yMaximum: " << yMaximum << endl;
   cout << "Points Total: " << pointsTotal << endl;
 
-  auto gSub = new TGraph(pointsTotal, xSub, ySub);
-  auto* hSubX = new TH1F("hx", "Sub X Histo", 10, xMinimum, xMaximum);
-  auto* hSubY = new TH1F("hy", "Sub Y Histo", 10, yMinimum, yMaximum);
+  auto* hSubX = new TH1D("hx", "Sub X Histo", 100, xMinimum, xMaximum);
+  //hSubX -> SetFillStyle(4050);
+  hSubX -> SetFillColor(3);
+  auto* hSubXSimulated = new TH1D("hxsim", "Sub X Histo Simulated", 100, xMinimum, xMaximum);
+  //hSubXSimulated -> SetFillStyle(4050);
+  hSubXSimulated -> SetFillColor(2);
+
+  auto* hSubY = new TH1D("hy", "Sub Y Histo", 100, yMinimum, yMaximum);
+  //hSubY -> SetFillStyle(4050);
+  hSubY -> SetFillColor(3);
+  auto* hSubYSimulated = new TH1D("hysim", "Sub Y Histo Simulated", 100, yMinimum, yMaximum);
+  //hSubYSimulated -> SetFillStyle(4050);
+  hSubYSimulated -> SetFillColor(2);
 
   for (Int_t i = 0; i < pointsTotal; i++)
   {
+    if(xSub[i] < xMinimum)
+     cout << "Overriden xMinimum" << endl;
+
     hSubX->Fill(xSub[i]);
     hSubY->Fill(ySub[i]);
   }
-  
 
-  //TAxis *axis = gSub->GetXaxis();
-  //axis->SetLimits(-500, 500);
-
-  //gSub->SetMarkerStyle(kFullCircle);
+  TF1 *fx = new TF1("fx", "gaus", xMinimum, xMaximum);
+  TF1 *fy = new TF1("fy", "gaus", yMinimum, yMaximum);
 
   TCanvas *c = new TCanvas("c", "c", 1000, 1000);
   c -> Draw();
@@ -235,15 +236,44 @@ void Analysis(Int_t run_number, Short_t nBoards = 1)
   yPad -> Draw();
 
   xPad -> cd();
-  hSubX -> Fit("gaus");
-  hSubX -> Draw();
+  hSubX -> Fit(fx);
 
   yPad -> cd();
-  hSubY -> Fit("gaus");
-  hSubY -> Draw();
+  hSubY -> Fit(fy);
 
   c -> Modified();
   c -> Update();
+
+  cout << "fy mean: " << fy -> GetParameter(1) << endl;
+  cout << "actual y: " << ySub[1] << endl;
+  cout << "result: " << gaus(ySub[1], fy -> GetParameter(1), fy -> GetParameter(2)) << endl;
+
+  // for(Int_t i = 0; i < pointsTotal; i++){
+  //   hSubXSimulated -> Fill(xSub[i], gaus(xSub[i], fx -> GetParameter(1), fx -> GetParameter(2)));
+  //   hSubYSimulated -> Fill(ySub[i], gaus(ySub[i], fy -> GetParameter(1), fy -> GetParameter(2)));
+  // }
+
+  hSubXSimulated -> FillRandom("fx");
+  hSubYSimulated -> FillRandom("fy");
+
+  xPad -> cd();
+  hSubX -> Draw();
+  hSubXSimulated -> Draw("SAME");
+
+  yPad -> cd();
+  //hSubX->GetXaxis()->SetRangeUser(fy -> GetParameter(1) - fy -> GetParameter(2), fy -> GetParameter(1) + fy -> GetParameter(2));
+  //hSubXSimulated->GetXaxis()->SetRangeUser(fy -> GetParameter(1) - fy -> GetParameter(2), fy -> GetParameter(1) + fy -> GetParameter(2));
+  hSubY -> Draw();
+  hSubYSimulated -> Draw("SAME");
+
+  c -> Modified();
+  c -> Update();
+
+  // TString FileToWriteName = "/home/facecerep/diplom/histo.root";
+  // TFile f(FileToWriteName, "RECREATE");
+  // cout << "file created at: " << FileToWriteName << endl;
+  // auto T = new TTree("T", "test");
+  // T->Branch("graph", &hSub, 10000, 0);
 
   getchar();
 }
