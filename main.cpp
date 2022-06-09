@@ -62,7 +62,6 @@ Double_t gaus(Double_t x, Double_t mean, Double_t sigma){
 
 void Analysis(Int_t run_number, Short_t nBoards = 1)
 {
-
   TString name;
 
   printf("Start analysis\n");
@@ -162,9 +161,9 @@ void Analysis(Int_t run_number, Short_t nBoards = 1)
 
       for (Int_t i = 0; i < minimumEntriesRead; i++)
       {
-        //if(xTrack[i] - xTOF[i] < 100 && xTrack[i] - xTOF[i] > -350){
-          Double_t x = xTrackTemp[i] - xTOFTemp[i];
-          Double_t y = yTrackTemp[i] - yTOFTemp[i];
+        //if(xTrack[i] - xTOF[i] < 100 && xTrack[i] - xTOF[i] > -350){          
+          Double_t x = xTOFTemp[i] - xTrackTemp[i];
+          Double_t y = yTOFTemp[i] - yTrackTemp[i];
           xSub[pointsTotal] = x;
           ySub[pointsTotal] = y;
 
@@ -199,35 +198,49 @@ void Analysis(Int_t run_number, Short_t nBoards = 1)
   cout << "yMaximum: " << yMaximum << endl;
   cout << "Points Total: " << pointsTotal << endl;
 
-  auto* hSubX = new TH1D("hx", "Sub X Histo", 100, xMinimum, xMaximum);
+  auto* hSubX = new TH1D("hsubx", "Sub X Histo", 100, xMinimum, xMaximum);
   //hSubX -> SetFillStyle(4050);
   hSubX -> SetFillColor(3);
-  auto* hSubXSimulated = new TH1D("hxsim", "Sub X Histo Simulated", 100, xMinimum, xMaximum);
+  auto* hSubXSimulated = new TH1D("hsubxsim", "Sub X Histo Simulated", 100, xMinimum, xMaximum);
   //hSubXSimulated -> SetFillStyle(4050);
   hSubXSimulated -> SetFillColor(2);
 
-  auto* hSubY = new TH1D("hy", "Sub Y Histo", 100, yMinimum, yMaximum);
+  auto* hSubY = new TH1D("hsuby", "Sub Y Histo", 100, yMinimum, yMaximum);
   //hSubY -> SetFillStyle(4050);
   hSubY -> SetFillColor(3);
-  auto* hSubYSimulated = new TH1D("hysim", "Sub Y Histo Simulated", 100, yMinimum, yMaximum);
+  auto* hSubYSimulated = new TH1D("hsubysim", "Sub Y Histo Simulated", 100, yMinimum, yMaximum);
   //hSubYSimulated -> SetFillStyle(4050);
   hSubYSimulated -> SetFillColor(2);
 
-  for (Int_t i = 0; i < pointsTotal; i++)
+  auto* hTrackX = new TH1D("htrackx", "Track X Histo", 100, xMinimum, xMaximum);
+  auto* hTrackY = new TH1D("htracky", "Track Y Histo", 100, yMinimum, yMaximum);
+
+  auto* hTOFX = new TH1D("htTOFx", "TOF X Histo", 100, xMinimum, xMaximum);
+  auto* hTOFY = new TH1D("htTOFy", "TOF Y Histo", 100, yMinimum, yMaximum);
+
+  for (Int_t i = 0; i < pointsTotal / 2; i++)
   {
-    if(xSub[i] < xMinimum)
-     cout << "Overriden xMinimum" << endl;
+    //if(xSub[i] < xMinimum)
+     //cout << "Overriden xMinimum" << endl;
 
     hSubX->Fill(xSub[i]);
     hSubY->Fill(ySub[i]);
+  }
+
+  for (Int_t i = pointsTotal / 2; i < pointsTotal; i++)
+  {
+    hTOFX -> Fill(xTOF[i]);
+    hTOFY -> Fill(yTOF[i]);
+    hTrackX -> Fill(xTrack[i]);
+    hTrackY -> Fill(yTrack[i]);
   }
 
   TF1 *fx = new TF1("fx", "gaus", xMinimum, xMaximum);
   TF1 *fy = new TF1("fy", "gaus", yMinimum, yMaximum);
 
   TCanvas *c = new TCanvas("c", "c", 1000, 1000);
-  c -> Draw();
-  c -> cd();
+  // c -> Draw();
+  // c -> cd();
 
   TPad *xPad = new TPad("xPad", "xPad", 0, 0, 0.5, 1);
   TPad *yPad = new TPad("yPad", "yPad", 0.5, 0, 1, 1);
@@ -241,30 +254,30 @@ void Analysis(Int_t run_number, Short_t nBoards = 1)
   yPad -> cd();
   hSubY -> Fit(fy);
 
-  c -> Modified();
-  c -> Update();
-
-  cout << "fy mean: " << fy -> GetParameter(1) << endl;
-  cout << "actual y: " << ySub[1] << endl;
-  cout << "result: " << gaus(ySub[1], fy -> GetParameter(1), fy -> GetParameter(2)) << endl;
-
-  // for(Int_t i = 0; i < pointsTotal; i++){
-  //   hSubXSimulated -> Fill(xSub[i], gaus(xSub[i], fx -> GetParameter(1), fx -> GetParameter(2)));
-  //   hSubYSimulated -> Fill(ySub[i], gaus(ySub[i], fy -> GetParameter(1), fy -> GetParameter(2)));
-  // }
-
   hSubXSimulated -> FillRandom("fx");
   hSubYSimulated -> FillRandom("fy");
 
+  hTrackX -> Add(hSubXSimulated);
+  hTrackY -> Add(hSubYSimulated);
+
+  hTrackX -> SetFillColor(46);
+  hTrackY -> SetFillColor(46);
+  hTOFX -> SetFillColor(30);
+  hTOFY -> SetFillColor(30);
+
   xPad -> cd();
-  hSubX -> Draw();
-  hSubXSimulated -> Draw("SAME");
+  // hSubX -> Draw();
+  // hSubXSimulated -> Draw("SAME");
+  hTOFX -> Draw();
+  hTrackX -> Draw("SAME");
+  hTOFX -> Draw("SAME");
 
   yPad -> cd();
-  //hSubX->GetXaxis()->SetRangeUser(fy -> GetParameter(1) - fy -> GetParameter(2), fy -> GetParameter(1) + fy -> GetParameter(2));
-  //hSubXSimulated->GetXaxis()->SetRangeUser(fy -> GetParameter(1) - fy -> GetParameter(2), fy -> GetParameter(1) + fy -> GetParameter(2));
-  hSubY -> Draw();
-  hSubYSimulated -> Draw("SAME");
+  // hSubY -> Draw();
+  // hSubYSimulated -> Draw("SAME");
+  hTOFY -> Draw();
+  hTrackY -> Draw("SAME");
+  hTOFY -> Draw("SAME");
 
   c -> Modified();
   c -> Update();
@@ -281,7 +294,6 @@ void Analysis(Int_t run_number, Short_t nBoards = 1)
  
 int main(int argc, char **argv)
 {
-
   Int_t run_number;
 
   if (argc < 2)
