@@ -55,13 +55,40 @@
 
 using namespace std;
 
-Double_t gaus(Double_t x, Double_t mean, Double_t sigma){
-  Double_t toReturn = x * TMath::Exp(-0.5 * TMath::Power((x - mean) / sigma, 2));
+Double_t FindMinimum(Int_t n, Double_t *array, Int_t start = 0, Int_t finish = 0){
+  Double_t toReturn = 0;
+  
+  if(finish == 0)
+    finish = n;
+
+  for(Int_t i = start; i < finish; i++){
+    cout << "read " << array[i] << endl;
+    if(array[i] < toReturn)
+      toReturn = array[i];
+  }
+
+  cout << "Minimum: " << toReturn << endl;
+
   return toReturn;
 }
 
-void Analysis(Int_t run_number, Short_t nBoards = 1)
-{
+Double_t FindMaximum(Int_t n, Double_t *array, Int_t start = 0, Int_t finish = 0){
+  Double_t toReturn = 0;
+  
+  if(finish == 0)
+    finish = n;
+
+  for(Int_t i = start; i < finish; i++){
+    if(array[i] > toReturn)
+      toReturn = array[i];
+  }
+
+  cout << "Maximum: " << toReturn << endl;
+
+  return toReturn;
+}
+
+void Analysis(Int_t run_number, Short_t nBoards = 1){
   TString name;
 
   printf("Start analysis\n");
@@ -120,11 +147,6 @@ void Analysis(Int_t run_number, Short_t nBoards = 1)
   Double_t xTOF[6624], yTOF[6624];
   Double_t xTrack[6624], yTrack[6624];
 
-  Int_t xMinimum = 0.99;
-  Int_t xMaximum = 0.99;
-  Int_t yMinimum = 0.99;
-  Int_t yMaximum = 0.99;
-
   Int_t pointsTotal = 0;
 
   for (Int_t iEv = 0; iEv < nEvForRead; iEv++)
@@ -172,15 +194,6 @@ void Analysis(Int_t run_number, Short_t nBoards = 1)
           xTrack[pointsTotal] = xTrackTemp[i];
           yTrack[pointsTotal] = yTrackTemp[i];
 
-          if(x < xMinimum)
-            xMinimum = x;
-          if(x > xMaximum)
-            xMaximum = x;
-          if(y < yMinimum)
-            yMinimum = y;
-          if(y > yMaximum)
-            yMaximum = y;
-
           pointsTotal++;
         //}
 
@@ -192,31 +205,35 @@ void Analysis(Int_t run_number, Short_t nBoards = 1)
     // cout << "Entries read TOF: " << entriesReadTOF << endl;
     // cout << "Entries read: " << minimumEntriesRead << endl;
   }
+  Double_t xMinimum = FindMinimum(pointsTotal, xSub);
+  Double_t xMaximum = FindMaximum(pointsTotal, xSub);
+  Double_t yMinimum = FindMinimum(pointsTotal, ySub);
+  Double_t yMaximum = FindMaximum(pointsTotal, ySub);
   cout << "xMinimum: " << xMinimum << endl;
-  cout << "xMaximum: " << xMaximum << endl;
-  cout << "yMinimum: " << yMinimum << endl;
-  cout << "yMaximum: " << yMaximum << endl;
-  cout << "Points Total: " << pointsTotal << endl;
+  //cout << "Points Total: " << pointsTotal << endl;
 
   auto* hSubX = new TH1D("hsubx", "Sub X Histo", 100, xMinimum, xMaximum);
+  hSubX -> SetFillColor(30);
   //hSubX -> SetFillStyle(4050);
-  hSubX -> SetFillColor(3);
   auto* hSubXSimulated = new TH1D("hsubxsim", "Sub X Histo Simulated", 100, xMinimum, xMaximum);
-  //hSubXSimulated -> SetFillStyle(4050);
-  hSubXSimulated -> SetFillColor(2);
+  hSubXSimulated -> SetFillColor(46);
+  hSubXSimulated -> SetFillStyle(3001);
 
   auto* hSubY = new TH1D("hsuby", "Sub Y Histo", 100, yMinimum, yMaximum);
+  hSubY -> SetFillColor(30);
   //hSubY -> SetFillStyle(4050);
-  hSubY -> SetFillColor(3);
   auto* hSubYSimulated = new TH1D("hsubysim", "Sub Y Histo Simulated", 100, yMinimum, yMaximum);
-  //hSubYSimulated -> SetFillStyle(4050);
-  hSubYSimulated -> SetFillColor(2);
+  hSubYSimulated -> SetFillColor(46);
+  hSubYSimulated -> SetFillStyle(3001);
 
-  auto* hTrackX = new TH1D("htrackx", "Track X Histo", 100, xMinimum, xMaximum);
-  auto* hTrackY = new TH1D("htracky", "Track Y Histo", 100, yMinimum, yMaximum);
+  // auto* hTrackX = new TH1D("htrackx", "Track X Histo", 100, FindMinimum(pointsTotal, xTrack, pointsTotal / 2, pointsTotal), FindMaximum(pointsTotal, xTrack, pointsTotal / 2, pointsTotal));
+  // auto* hTrackY = new TH1D("htracky", "Track Y Histo", 100, FindMinimum(pointsTotal, yTrack, pointsTotal / 2, pointsTotal), FindMaximum(pointsTotal, yTrack, pointsTotal / 2, pointsTotal));
 
-  auto* hTOFX = new TH1D("htTOFx", "TOF X Histo", 100, xMinimum, xMaximum);
-  auto* hTOFY = new TH1D("htTOFy", "TOF Y Histo", 100, yMinimum, yMaximum);
+  auto* hTrackX = new TH1D("hTOFsimulatedx", "TOF X Histo Simulated", 100, xMinimum, xMaximum);
+  auto* hTrackY = new TH1D("hTOFsimulatedy", "TOF Y Histo Simulated", 100, yMinimum, yMaximum);
+
+  auto* hTOFX = new TH1D("hTOFx", "TOF X Histo", 100, FindMinimum(pointsTotal, xTOF, pointsTotal / 2, pointsTotal), FindMaximum(pointsTotal, xTOF, pointsTotal / 2, pointsTotal));
+  auto* hTOFY = new TH1D("hTOFy", "TOF Y Histo", 100, FindMinimum(pointsTotal, yTOF, pointsTotal / 2, pointsTotal), FindMaximum(pointsTotal, yTOF, pointsTotal / 2, pointsTotal));
 
   for (Int_t i = 0; i < pointsTotal / 2; i++)
   {
@@ -260,24 +277,24 @@ void Analysis(Int_t run_number, Short_t nBoards = 1)
   hTrackX -> Add(hSubXSimulated);
   hTrackY -> Add(hSubYSimulated);
 
+  hTrackX -> SetFillStyle(3001);
   hTrackX -> SetFillColor(46);
+  hTrackY -> SetFillStyle(3001);
   hTrackY -> SetFillColor(46);
   hTOFX -> SetFillColor(30);
   hTOFY -> SetFillColor(30);
 
   xPad -> cd();
-  // hSubX -> Draw();
-  // hSubXSimulated -> Draw("SAME");
+  //hSubX -> Draw();
+  //hSubXSimulated -> Draw("SAME");
   hTOFX -> Draw();
   hTrackX -> Draw("SAME");
-  hTOFX -> Draw("SAME");
 
   yPad -> cd();
-  // hSubY -> Draw();
-  // hSubYSimulated -> Draw("SAME");
+  //hSubY -> Draw();
+  //hSubYSimulated -> Draw("SAME");
   hTOFY -> Draw();
   hTrackY -> Draw("SAME");
-  hTOFY -> Draw("SAME");
 
   c -> Modified();
   c -> Update();
