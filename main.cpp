@@ -56,24 +56,21 @@
 using namespace std;
 
 Double_t FindMinimum(Int_t n, Double_t *array, Int_t start = 0, Int_t finish = 0){
-  Double_t toReturn = 0;
+  Double_t toReturn = 100000;
   
   if(finish == 0)
     finish = n;
 
   for(Int_t i = start; i < finish; i++){
-    cout << "read " << array[i] << endl;
     if(array[i] < toReturn)
       toReturn = array[i];
   }
-
-  cout << "Minimum: " << toReturn << endl;
 
   return toReturn;
 }
 
 Double_t FindMaximum(Int_t n, Double_t *array, Int_t start = 0, Int_t finish = 0){
-  Double_t toReturn = 0;
+  Double_t toReturn = -10000;
   
   if(finish == 0)
     finish = n;
@@ -82,8 +79,6 @@ Double_t FindMaximum(Int_t n, Double_t *array, Int_t start = 0, Int_t finish = 0
     if(array[i] > toReturn)
       toReturn = array[i];
   }
-
-  cout << "Maximum: " << toReturn << endl;
 
   return toReturn;
 }
@@ -143,9 +138,12 @@ void Analysis(Int_t run_number, Short_t nBoards = 1){
   Double_t xTOFTemp[100], yTOFTemp[100];
   Double_t xTrackTemp[100], yTrackTemp[100];
 
-  Double_t xSub[6624], ySub[6624];
-  Double_t xTOF[6624], yTOF[6624];
-  Double_t xTrack[6624], yTrack[6624];
+  Int_t totalPointsNotLimited = 6624;
+  Int_t totalPointsLimited = 1655;
+
+  Double_t xSub[totalPointsNotLimited], ySub[totalPointsNotLimited];
+  Double_t xTOF[totalPointsNotLimited], yTOF[totalPointsNotLimited];
+  Double_t xTrack[totalPointsNotLimited], yTrack[totalPointsNotLimited];
 
   Int_t pointsTotal = 0;
 
@@ -183,7 +181,7 @@ void Analysis(Int_t run_number, Short_t nBoards = 1){
 
       for (Int_t i = 0; i < minimumEntriesRead; i++)
       {
-        //if(xTrack[i] - xTOF[i] < 100 && xTrack[i] - xTOF[i] > -350){          
+        if(xTrackTemp[i] < 263.75 && xTrackTemp[i] > -263.75){          
           Double_t x = xTOFTemp[i] - xTrackTemp[i];
           Double_t y = yTOFTemp[i] - yTrackTemp[i];
           xSub[pointsTotal] = x;
@@ -195,7 +193,7 @@ void Analysis(Int_t run_number, Short_t nBoards = 1){
           yTrack[pointsTotal] = yTrackTemp[i];
 
           pointsTotal++;
-        //}
+        }
 
         //if(!xSub[pointsTotal] > 100)
       }
@@ -235,6 +233,9 @@ void Analysis(Int_t run_number, Short_t nBoards = 1){
   auto* hTOFX = new TH1D("hTOFx", "TOF X Histo", 100, FindMinimum(pointsTotal, xTOF, pointsTotal / 2, pointsTotal), FindMaximum(pointsTotal, xTOF, pointsTotal / 2, pointsTotal));
   auto* hTOFY = new TH1D("hTOFy", "TOF Y Histo", 100, FindMinimum(pointsTotal, yTOF, pointsTotal / 2, pointsTotal), FindMaximum(pointsTotal, yTOF, pointsTotal / 2, pointsTotal));
 
+  cout << "TOFx minimum" << FindMinimum(pointsTotal, xTOF) << endl;
+  cout << "TOFx maximum" << FindMaximum(pointsTotal, xTOF) << endl;
+
   for (Int_t i = 0; i < pointsTotal / 2; i++)
   {
     //if(xSub[i] < xMinimum)
@@ -244,7 +245,7 @@ void Analysis(Int_t run_number, Short_t nBoards = 1){
     hSubY->Fill(ySub[i]);
   }
 
-  for (Int_t i = pointsTotal / 2; i < pointsTotal; i++)
+  for (Int_t i = 0; i < pointsTotal / 2; i++)
   {
     hTOFX -> Fill(xTOF[i]);
     hTOFY -> Fill(yTOF[i]);
@@ -254,6 +255,13 @@ void Analysis(Int_t run_number, Short_t nBoards = 1){
 
   TF1 *fx = new TF1("fx", "gaus", xMinimum, xMaximum);
   TF1 *fy = new TF1("fy", "gaus", yMinimum, yMaximum);
+
+  TF1 *fTOFx = new TF1("fTOFx", "gaus", xMinimum, xMaximum);
+  fTOFx -> SetLineColor(3);
+  TF1 *fTOFy = new TF1("fTOFy", "gaus", yMinimum, yMaximum);
+  fTOFy -> SetLineColor(3);
+  TF1 *fTOFSimulatedx = new TF1("fTOFSimulatedx", "gaus", xMinimum, xMaximum);
+  TF1 *fTOFSimulatedy = new TF1("fTOFSimulatedy", "gaus", yMinimum, yMaximum);
 
   TCanvas *c = new TCanvas("c", "c", 1000, 1000);
   // c -> Draw();
@@ -277,24 +285,33 @@ void Analysis(Int_t run_number, Short_t nBoards = 1){
   hTrackX -> Add(hSubXSimulated);
   hTrackY -> Add(hSubYSimulated);
 
+  // hTOFX -> Add(hTrackX, -1);
+  // hTOFY -> Add(hTrackY, -1);
+
   hTrackX -> SetFillStyle(3001);
   hTrackX -> SetFillColor(46);
   hTrackY -> SetFillStyle(3001);
   hTrackY -> SetFillColor(46);
+  // hTOFX -> SetFillStyle(3001);
   hTOFX -> SetFillColor(30);
+  // hTOFY -> SetFillStyle(3001);
   hTOFY -> SetFillColor(30);
 
   xPad -> cd();
-  //hSubX -> Draw();
-  //hSubXSimulated -> Draw("SAME");
+  // hSubX -> Draw();
+  // hSubXSimulated -> Draw("SAME");
   hTOFX -> Draw();
+  hTOFX -> Fit("fTOFx");
   hTrackX -> Draw("SAME");
+  hTrackX -> Fit("fTOFSimulatedx");
 
   yPad -> cd();
-  //hSubY -> Draw();
-  //hSubYSimulated -> Draw("SAME");
+  // hSubY -> Draw();
+  // hSubYSimulated -> Draw("SAME");
   hTOFY -> Draw();
+  hTOFY -> Fit("fTOFy");
   hTrackY -> Draw("SAME");
+  hTrackY -> Fit("fTOFSimulatedy");
 
   c -> Modified();
   c -> Update();
