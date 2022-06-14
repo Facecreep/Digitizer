@@ -83,11 +83,12 @@ Double_t FindMaximum(Int_t n, Double_t *array, Int_t start = 0, Int_t finish = 0
   return toReturn;
 }
 
-void Analysis(Int_t run_number, Short_t nBoards = 1){
+void Analysis(Int_t run_number, Bool_t verbose = kFALSE){
   TString name;
 
   printf("Start analysis\n");
-  TString FileName = "/home/facecerep/Downloads/Merge_RPC_DRS_allTracks (1)"; // NameInFile
+  TString FileName = "/home/alex/Downloads/Merge_RPC_DRS_allTracks"; // NameInFile
+  // TString FileName = "/home/facecerep/Downloads/Merge_RPC_DRS_allTracks (1)"; // NameInFile
   FileName += ".root";                                                        // NameInFile
 
   cout << "\nOpen file \n " << FileName << endl
@@ -111,6 +112,15 @@ void Analysis(Int_t run_number, Short_t nBoards = 1){
   nEvForRead = eveTree->GetEntries();
   cout << "In the file " << nEvForRead << " events \n"
        << endl;
+
+  if (verbose){
+    auto *Branches = eveTree->GetListOfBranches();
+    for (Int_t iBr = 0; iBr < eveTree->GetNbranches(); ++iBr){
+      auto Branch = (TBranch *) Branches->At(iBr);
+      Branch->Print();
+    }
+    getchar();
+  }
 
   ResultSetBranch = eveTree->SetBranchAddress("TOF400Conteiner", &TOF_digi);
   printf("TOF400Conteiner Set Branch = %i\n", ResultSetBranch);
@@ -149,25 +159,33 @@ void Analysis(Int_t run_number, Short_t nBoards = 1){
 
   for (Int_t iEv = 0; iEv < nEvForRead; iEv++)
   {
+    if (verbose)
+      cout << "EVENT #" << iEv << endl;
     ReadBytes = eveTree->GetEntry(iEv);
 
     entriesReadTOF = 0;
     entriesReadTrack = 0;
 
+    if (verbose && TOF_digi->GetEntriesFast()>0 ) cout << "TOF hits" << endl;
     for (Int_t iDig = 0; iDig < TOF_digi->GetEntriesFast(); iDig++)
     {
       BmnTOF1Conteiner *digi = (BmnTOF1Conteiner *)TOF_digi->At(iDig);
       xTOFTemp[iDig] = digi->GetX();
       yTOFTemp[iDig] = digi->GetY();
       entriesReadTOF++;
+      if (verbose)
+        cout << "TOF_x = " << xTOFTemp[iDig] << "\t TOF_y = " << yTOFTemp[iDig] << endl;
     }
 
+    if (verbose && Tracks_digi->GetEntriesFast()>0 ) cout << "Tracks hits" << endl;
     for (Int_t iDig = 0; iDig < Tracks_digi->GetEntriesFast(); iDig++)
     {
       Track *digi = (Track *)Tracks_digi->At(iDig);
       xTrackTemp[iDig] = digi->GetfStopPointX();
       yTrackTemp[iDig] = digi->GetfStopPointY();
       entriesReadTrack++;
+      if (verbose)
+        cout << "Tra_x = " << xTrackTemp[iDig] << "\t Tra_y = " << yTrackTemp[iDig] << endl;
     }
 
     if (entriesReadTOF != 0 && entriesReadTrack != 0)
@@ -179,9 +197,14 @@ void Analysis(Int_t run_number, Short_t nBoards = 1){
       else
         minimumEntriesRead = entriesReadTrack;
 
+      if (verbose){
+        cout << "Readed entries (min, TOF, Tracks)" << endl;
+        cout << minimumEntriesRead << "\t" << entriesReadTOF << "\t" << entriesReadTrack << endl;
+      }
+
       for (Int_t i = 0; i < minimumEntriesRead; i++)
       {
-        if(xTrackTemp[i] < 263.75 && xTrackTemp[i] > -263.75){          
+        if(xTrackTemp[i] < 263.75 && xTrackTemp[i] > -263.75){
           Double_t x = xTOFTemp[i] - xTrackTemp[i];
           Double_t y = yTOFTemp[i] - yTrackTemp[i];
           xSub[pointsTotal] = x;
@@ -193,6 +216,15 @@ void Analysis(Int_t run_number, Short_t nBoards = 1){
           yTrack[pointsTotal] = yTrackTemp[i];
 
           pointsTotal++;
+
+          // HERE IS A ERROR !
+          if (verbose){
+            cout << "Calculation of the differences" << endl;
+            cout << "TOF_x = " << xTOFTemp[i] << "\t TOF_y = " << yTOFTemp[i] << endl;
+            cout << "Tra_x = " << xTrackTemp[i] << "\t Tra_y = " << yTrackTemp[i] << endl;
+
+            getchar();
+          }
         }
 
         //if(!xSub[pointsTotal] > 100)
@@ -236,7 +268,7 @@ void Analysis(Int_t run_number, Short_t nBoards = 1){
   cout << "TOFx minimum" << FindMinimum(pointsTotal, xTOF) << endl;
   cout << "TOFx maximum" << FindMaximum(pointsTotal, xTOF) << endl;
 
-  for (Int_t i = 0; i < pointsTotal / 2; i++)
+  for (Int_t i = 0; i < pointsTotal / 2; i++) // WHY DIVIDE BY 2 ??????
   {
     //if(xSub[i] < xMinimum)
      //cout << "Overriden xMinimum" << endl;
@@ -339,7 +371,7 @@ int main(int argc, char **argv)
     run_number = atoi(argv[1]);
   std::cout << "Doing analysis for run " << run_number << "\n";
   TApplication theApp("App", &argc, argv);
-  Analysis(run_number);
+  Analysis(run_number, (Bool_t) run_number);
   std::cout << "Analysis complete!" << std::endl;
   return 0;
 }
