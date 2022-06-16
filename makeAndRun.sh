@@ -1,3 +1,3 @@
 make clean
 make
-./analysis_time 0
+./analysis_time $1

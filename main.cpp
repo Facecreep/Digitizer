@@ -34,7 +34,7 @@
 #include <TObject.h>
 #include <TPad.h>
 #include <TProfile.h>
-#include "TRandom2.h"
+#include "TRandom.h"
 #include <TSpline.h>
 #include <TTree.h>
 
@@ -87,7 +87,7 @@ void Analysis(Int_t run_number, Bool_t verbose = kFALSE){
   TString name;
 
   printf("Start analysis\n");
-  TString FileName = "/home/alex/Downloads/Merge_RPC_DRS_allTracks"; // NameInFile
+  TString FileName = "/home/facecerep/Downloads/Merge_RPC_DRS_allTracks (1)"; // NameInFile
   // TString FileName = "/home/facecerep/Downloads/Merge_RPC_DRS_allTracks (1)"; // NameInFile
   FileName += ".root";                                                        // NameInFile
 
@@ -181,8 +181,13 @@ void Analysis(Int_t run_number, Bool_t verbose = kFALSE){
     for (Int_t iDig = 0; iDig < Tracks_digi->GetEntriesFast(); iDig++)
     {
       Track *digi = (Track *)Tracks_digi->At(iDig);
-      xTrackTemp[iDig] = digi->GetfStopPointX();
+      xTrackTemp[iDig] = digi->GetfStopPointX(); // Вычислить как Mx * z (Для каждого плейна всой z) + Nx 
+                                                 // Это делается так как у каждого детектора разные координаты по z и это нужно учитв=ывать
       yTrackTemp[iDig] = digi->GetfStopPointY();
+
+      // xTrackTemp[iDig] = digi -> GetfFitParamMX() * digi -> GetfFirstPointZ() + digi -> GetfFitParamNX();
+      // yTrackTemp[iDig] = digi -> GetfFitParamMY() * digi -> GetfFirstPointZ() + digi -> GetfFitParamNY();
+
       entriesReadTrack++;
       if (verbose)
         cout << "Tra_x = " << xTrackTemp[iDig] << "\t Tra_y = " << yTrackTemp[iDig] << endl;
@@ -202,38 +207,67 @@ void Analysis(Int_t run_number, Bool_t verbose = kFALSE){
         cout << minimumEntriesRead << "\t" << entriesReadTOF << "\t" << entriesReadTrack << endl;
       }
 
-      for (Int_t i = 0; i < minimumEntriesRead; i++)
-      {
-        if(xTrackTemp[i] < 263.75 && xTrackTemp[i] > -263.75){
-          Double_t x = xTOFTemp[i] - xTrackTemp[i];
-          Double_t y = yTOFTemp[i] - yTrackTemp[i];
-          xSub[pointsTotal] = x;
-          ySub[pointsTotal] = y;
+      for (Int_t i = 0; i < minimumEntriesRead; i++){
+        Double_t minimumXSub = 10000;
+        Double_t minimumYSub = 10000;
 
-          xTOF[pointsTotal] = xTOFTemp[i];
-          yTOF[pointsTotal] = yTOFTemp[i];
-          xTrack[pointsTotal] = xTrackTemp[i];
-          yTrack[pointsTotal] = yTrackTemp[i];
+        Int_t minimumTOFNum = 10000;
+        Int_t minimumTrackNum = 10000;
 
-          pointsTotal++;
+        for (Int_t iTOF = 0; iTOF < entriesReadTOF; iTOF++){
+          for (Int_t iTrack = 0; iTrack < entriesReadTrack; iTrack++){
+            if(xTOFTemp[iTOF] != NULL && xTrackTemp[iTrack] != NULL){
+              Double_t x = xTOFTemp[iTOF] - xTrackTemp[iTrack];
+              Double_t y = yTOFTemp[iTOF] - yTrackTemp[iTrack];
+              
+              Double_t distance = TMath::Sqrt(x * x + y * y);
 
-          // HERE IS A ERROR !
-          if (verbose){
-            cout << "Calculation of the differences" << endl;
-            cout << "TOF_x = " << xTOFTemp[i] << "\t TOF_y = " << yTOFTemp[i] << endl;
-            cout << "Tra_x = " << xTrackTemp[i] << "\t Tra_y = " << yTrackTemp[i] << endl;
+              Double_t minimalDistance = TMath::Sqrt(minimumXSub * minimumXSub + minimumYSub * minimumYSub);
 
-            getchar();
+              if (distance < minimalDistance){
+                minimumXSub = x;
+                minimumYSub = y;
+
+                minimumTOFNum = iTOF;
+                minimumTrackNum = iTrack;
+              }
+            }
           }
         }
 
-        //if(!xSub[pointsTotal] > 100)
+        if(minimumXSub != 10000){
+          xSub[pointsTotal] = minimumXSub;
+          ySub[pointsTotal] = minimumYSub;
+
+          xTOF[pointsTotal] = xTOFTemp[minimumTOFNum];
+          yTOF[pointsTotal] = yTOFTemp[minimumTOFNum];
+          xTrack[pointsTotal] = xTrackTemp[minimumTrackNum];
+          yTrack[pointsTotal] = yTrackTemp[minimumTrackNum];
+
+          if (verbose){
+            cout << "Calculation of the differences" << endl;
+            cout << "Sub_x = " << xSub[pointsTotal] << "\t Sub_y = " << ySub[pointsTotal] << endl;
+            cout << "TOF_x = " << xTOFTemp[minimumTOFNum] << "\t Tof_y = " << yTOFTemp[minimumTOFNum] << endl;
+            cout << "TOF_x_Num = " << minimumTOFNum << "\t Tof_y_Num = " << minimumTOFNum << endl;
+            cout << "Track_x = " << xTrackTemp[minimumTrackNum] << "\t Track_y = " << yTrackTemp[minimumTrackNum] << endl;
+            cout << "Track_x_Num = " << minimumTrackNum << "\t Track_y_Num = " << minimumTrackNum << endl;
+
+            getchar();
+          }
+
+          xTOFTemp[minimumTOFNum] = NULL;
+          yTOFTemp[minimumTOFNum] = NULL;
+          xTrackTemp[minimumTrackNum] = NULL;
+          yTrackTemp[minimumTrackNum] = NULL;
+
+          pointsTotal++;
+        }
+        else{
+          if(verbose)
+            cout << "Skipped" << endl;
+        }
       }
     }
-
-    // cout << "Enrties read track: " << entriesReadTrack << endl;
-    // cout << "Entries read TOF: " << entriesReadTOF << endl;
-    // cout << "Entries read: " << minimumEntriesRead << endl;
   }
   Double_t xMinimum = FindMinimum(pointsTotal, xSub);
   Double_t xMaximum = FindMaximum(pointsTotal, xSub);
@@ -242,33 +276,35 @@ void Analysis(Int_t run_number, Bool_t verbose = kFALSE){
   cout << "xMinimum: " << xMinimum << endl;
   //cout << "Points Total: " << pointsTotal << endl;
 
-  auto* hSubX = new TH1D("hsubx", "Sub X Histo", 100, xMinimum, xMaximum);
+  // auto* hSubX = new TH1D("hsubx", "Sub X Histo", 100, xMinimum, xMaximum);
+  auto* hSubX = new TH1D("hsubx", "Sub X Histo", 100, 100, 300);
   hSubX -> SetFillColor(30);
   //hSubX -> SetFillStyle(4050);
   auto* hSubXSimulated = new TH1D("hsubxsim", "Sub X Histo Simulated", 100, xMinimum, xMaximum);
   hSubXSimulated -> SetFillColor(46);
   hSubXSimulated -> SetFillStyle(3001);
 
-  auto* hSubY = new TH1D("hsuby", "Sub Y Histo", 100, yMinimum, yMaximum);
+  // auto* hSubY = new TH1D("hsuby", "Sub Y Histo", 100, yMinimum, yMaximum);
+  auto* hSubY = new TH1D("hsuby", "Sub Y Histo", 100, -100, 20);
   hSubY -> SetFillColor(30);
   //hSubY -> SetFillStyle(4050);
   auto* hSubYSimulated = new TH1D("hsubysim", "Sub Y Histo Simulated", 100, yMinimum, yMaximum);
   hSubYSimulated -> SetFillColor(46);
   hSubYSimulated -> SetFillStyle(3001);
 
-  // auto* hTrackX = new TH1D("htrackx", "Track X Histo", 100, FindMinimum(pointsTotal, xTrack, pointsTotal / 2, pointsTotal), FindMaximum(pointsTotal, xTrack, pointsTotal / 2, pointsTotal));
-  // auto* hTrackY = new TH1D("htracky", "Track Y Histo", 100, FindMinimum(pointsTotal, yTrack, pointsTotal / 2, pointsTotal), FindMaximum(pointsTotal, yTrack, pointsTotal / 2, pointsTotal));
-
-  auto* hTrackX = new TH1D("hTOFsimulatedx", "TOF X Histo Simulated", 100, xMinimum, xMaximum);
-  auto* hTrackY = new TH1D("hTOFsimulatedy", "TOF Y Histo Simulated", 100, yMinimum, yMaximum);
-
+  auto* hTrackX = new TH1D("hTrackx", "Track X Histo", 100, FindMinimum(pointsTotal, xTrack, pointsTotal / 2, pointsTotal), FindMaximum(pointsTotal, xTrack, pointsTotal / 2, pointsTotal));
+  auto* hTrackY = new TH1D("hTracky", "Track Y Histo", 100, FindMinimum(pointsTotal, yTrack, pointsTotal / 2, pointsTotal), FindMaximum(pointsTotal, yTrack, pointsTotal / 2, pointsTotal));
+  // auto* hTrackX = new TH1D("hTrackx", "Track X Histo", 100, -640, -580);
+  // auto* hTrackY = new TH1D("hTracky", "Track Y Histo", 100, 0, 350);
+  hTrackX -> SetFillColor(30);
+  hTrackY -> SetFillColor(30);
+  
   auto* hTOFX = new TH1D("hTOFx", "TOF X Histo", 100, FindMinimum(pointsTotal, xTOF, pointsTotal / 2, pointsTotal), FindMaximum(pointsTotal, xTOF, pointsTotal / 2, pointsTotal));
   auto* hTOFY = new TH1D("hTOFy", "TOF Y Histo", 100, FindMinimum(pointsTotal, yTOF, pointsTotal / 2, pointsTotal), FindMaximum(pointsTotal, yTOF, pointsTotal / 2, pointsTotal));
+  auto* hTOFXSimulated = new TH1D("hTOFx", "TOF X Histo", 100, FindMinimum(pointsTotal, xTOF, pointsTotal / 2, pointsTotal), FindMaximum(pointsTotal, xTOF, pointsTotal / 2, pointsTotal));
+  auto* hTOFYSimulated = new TH1D("hTOFy", "TOF Y Histo", 100, FindMinimum(pointsTotal, yTOF, pointsTotal / 2, pointsTotal), FindMaximum(pointsTotal, yTOF, pointsTotal / 2, pointsTotal));
 
-  cout << "TOFx minimum" << FindMinimum(pointsTotal, xTOF) << endl;
-  cout << "TOFx maximum" << FindMaximum(pointsTotal, xTOF) << endl;
-
-  for (Int_t i = 0; i < pointsTotal / 2; i++) // WHY DIVIDE BY 2 ??????
+  for (Int_t i = 0; i < pointsTotal; i++) // WHY DIVIDE BY 2 ??????
   {
     //if(xSub[i] < xMinimum)
      //cout << "Overriden xMinimum" << endl;
@@ -277,7 +313,7 @@ void Analysis(Int_t run_number, Bool_t verbose = kFALSE){
     hSubY->Fill(ySub[i]);
   }
 
-  for (Int_t i = 0; i < pointsTotal / 2; i++)
+  for (Int_t i = pointsTotal / 2; i < pointsTotal; i++)
   {
     hTOFX -> Fill(xTOF[i]);
     hTOFY -> Fill(yTOF[i]);
@@ -293,11 +329,11 @@ void Analysis(Int_t run_number, Bool_t verbose = kFALSE){
   TF1 *fTOFy = new TF1("fTOFy", "gaus", yMinimum, yMaximum);
   fTOFy -> SetLineColor(3);
   TF1 *fTOFSimulatedx = new TF1("fTOFSimulatedx", "gaus", xMinimum, xMaximum);
+  fTOFSimulatedx -> SetLineColor(2);
   TF1 *fTOFSimulatedy = new TF1("fTOFSimulatedy", "gaus", yMinimum, yMaximum);
+  fTOFSimulatedy -> SetLineColor(2);
 
   TCanvas *c = new TCanvas("c", "c", 1000, 1000);
-  // c -> Draw();
-  // c -> cd();
 
   TPad *xPad = new TPad("xPad", "xPad", 0, 0, 0.5, 1);
   TPad *yPad = new TPad("yPad", "yPad", 0.5, 0, 1, 1);
@@ -306,53 +342,94 @@ void Analysis(Int_t run_number, Bool_t verbose = kFALSE){
   yPad -> Draw();
 
   xPad -> cd();
+  cout << "-------- hSubX Fit --------" << endl;
   hSubX -> Fit(fx);
 
   yPad -> cd();
+  cout << "-------- hSubY Fit --------" << endl;
   hSubY -> Fit(fy);
 
-  hSubXSimulated -> FillRandom("fx");
-  hSubYSimulated -> FillRandom("fy");
+  TRandom *random = new TRandom();
+  Double_t fxMean = fx -> GetParameter(1);
+  Double_t fxSigma = fx -> GetParameter(2);
+  Double_t fyMean = fy -> GetParameter(1);
+  Double_t fySigma = fy -> GetParameter(2);
 
-  hTrackX -> Add(hSubXSimulated);
-  hTrackY -> Add(hSubYSimulated);
+  for (Int_t i = pointsTotal / 2; i < pointsTotal; i++){
+    Double_t SubXSimulated = random -> Gaus(fxMean, fxSigma);
+    Double_t SubYSimulated = random -> Gaus(fyMean, fySigma);
 
-  // hTOFX -> Add(hTrackX, -1);
-  // hTOFY -> Add(hTrackY, -1);
+    hSubXSimulated -> Fill(SubXSimulated);
+    hSubYSimulated -> Fill(SubYSimulated);
 
-  hTrackX -> SetFillStyle(3001);
-  hTrackX -> SetFillColor(46);
-  hTrackY -> SetFillStyle(3001);
-  hTrackY -> SetFillColor(46);
-  // hTOFX -> SetFillStyle(3001);
+    hTOFXSimulated -> Fill(xTrack[i] + SubXSimulated);
+    hTOFYSimulated -> Fill(yTrack[i] + SubYSimulated);
+  }
+  
+  cout << "-------- hSubXSimulated Fit --------" << endl;
+  hSubXSimulated -> Fit("gaus");
+  cout << "-------- hSubYSimulated Fit --------" << endl;
+  hSubYSimulated -> Fit("gaus");
+
+  hTOFXSimulated -> SetFillStyle(3001);
+  hTOFXSimulated -> SetFillColor(46);
+  hTOFYSimulated -> SetFillStyle(3001);
+  hTOFYSimulated -> SetFillColor(46);
   hTOFX -> SetFillColor(30);
-  // hTOFY -> SetFillStyle(3001);
   hTOFY -> SetFillColor(30);
-
+  
   xPad -> cd();
-  // hSubX -> Draw();
-  // hSubXSimulated -> Draw("SAME");
-  hTOFX -> Draw();
-  hTOFX -> Fit("fTOFx");
-  hTrackX -> Draw("SAME");
-  hTrackX -> Fit("fTOFSimulatedx");
+  hSubX -> Draw();
+  hSubXSimulated -> Draw("SAME");
+  hTrackX -> Draw();
 
   yPad -> cd();
-  // hSubY -> Draw();
-  // hSubYSimulated -> Draw("SAME");
-  hTOFY -> Draw();
-  hTOFY -> Fit("fTOFy");
-  hTrackY -> Draw("SAME");
-  hTrackY -> Fit("fTOFSimulatedy");
+  hSubY -> Draw();
+  hSubYSimulated -> Draw("SAME");
+  hTrackY -> Draw();
 
   c -> Modified();
   c -> Update();
 
-  // TString FileToWriteName = "/home/facecerep/diplom/histo.root";
-  // TFile f(FileToWriteName, "RECREATE");
-  // cout << "file created at: " << FileToWriteName << endl;
-  // auto T = new TTree("T", "test");
-  // T->Branch("graph", &hSub, 10000, 0);
+  getchar();
+
+  xPad -> cd();
+  hTOFX -> Draw();
+  cout << "-------- hTOFX Fit --------" << endl;
+  hTOFX -> Fit("fTOFx");
+  hTOFXSimulated -> Draw("SAME");
+  cout << "-------- hTOFXSimulated Fit --------" << endl;
+  hTOFXSimulated -> Fit("fTOFSimulatedx");
+
+  yPad -> cd();
+  hTOFY -> Draw();
+  cout << "-------- hTOFY Fit --------" << endl;
+  hTOFY -> Fit("fTOFy");
+  hTOFYSimulated -> Draw("SAME");
+  cout << "-------- hTOFYSimulated Fit --------" << endl;
+  hTOFYSimulated -> Fit("fTOFSimulatedy");
+
+  c -> Modified();
+  c -> Update();
+
+  Double_t xMeanPrecision = fTOFx -> GetParameter(1) / fTOFSimulatedx -> GetParameter(1);
+  if(xMeanPrecision > 1)
+    xMeanPrecision = 1 / xMeanPrecision;
+  Double_t yMeanPrecision = fTOFy -> GetParameter(1) / fTOFSimulatedy -> GetParameter(1);
+  if(yMeanPrecision > 1)
+    yMeanPrecision = 1 / yMeanPrecision;
+  Double_t xSigmaPrecision = fTOFx -> GetParameter(2) / fTOFSimulatedx -> GetParameter(2);
+  if(xSigmaPrecision > 1)
+    xSigmaPrecision = 1 / xSigmaPrecision;
+  Double_t ySigmaPrecision = fTOFy -> GetParameter(2) / fTOFSimulatedy -> GetParameter(2);
+  if(ySigmaPrecision > 1)
+    ySigmaPrecision = 1 / ySigmaPrecision;
+
+  cout << "----------------" << endl;
+  cout << "xMeanPrecision: " << xMeanPrecision << endl;
+  cout << "xSigmaPrecision: " << xSigmaPrecision << endl;
+  cout << "yMeanPrecision: " << yMeanPrecision << endl;
+  cout << "ySigmaPrecision: " << ySigmaPrecision << endl;
 
   getchar();
 }
