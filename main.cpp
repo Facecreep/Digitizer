@@ -27,6 +27,7 @@
 #include <TH1.h>
 #include <TH2.h>
 #include <THStack.h>
+#include <TImage.h>
 #include <TLeaf.h>
 #include <TList.h>
 #include <TMath.h>
@@ -146,7 +147,9 @@ void Analysis(Int_t run_number, Bool_t verbose = kFALSE){
 
 
   Double_t xTOFTemp[100], yTOFTemp[100];
-  Double_t xTrackTemp[100], yTrackTemp[100];
+  Int_t plane[100];
+  Double_t xTrackTemp[100], yTrackTemp[100], Mx[100], Nx[100], My[100], Ny[100];
+  Double_t Z[4] = {868, 885, 901, 901};
 
   Int_t totalPointsNotLimited = 6624;
   Int_t totalPointsLimited = 1655;
@@ -172,6 +175,7 @@ void Analysis(Int_t run_number, Bool_t verbose = kFALSE){
       BmnTOF1Conteiner *digi = (BmnTOF1Conteiner *)TOF_digi->At(iDig);
       xTOFTemp[iDig] = digi->GetX();
       yTOFTemp[iDig] = digi->GetY();
+      plane[iDig] = digi->GetPlane();
       entriesReadTOF++;
       if (verbose)
         cout << "TOF_x = " << xTOFTemp[iDig] << "\t TOF_y = " << yTOFTemp[iDig] << endl;
@@ -184,6 +188,11 @@ void Analysis(Int_t run_number, Bool_t verbose = kFALSE){
       xTrackTemp[iDig] = digi->GetfStopPointX(); // Вычислить как Mx * z (Для каждого плейна всой z) + Nx 
                                                  // Это делается так как у каждого детектора разные координаты по z и это нужно учитв=ывать
       yTrackTemp[iDig] = digi->GetfStopPointY();
+
+      Mx[iDig] = digi -> GetfFitParamMX();
+      Nx[iDig] = digi -> GetfFitParamNX();
+      My[iDig] = digi -> GetfFitParamMY();
+      Ny[iDig] = digi -> GetfFitParamNY();
 
       // xTrackTemp[iDig] = digi -> GetfFitParamMX() * digi -> GetfFirstPointZ() + digi -> GetfFitParamNX();
       // yTrackTemp[iDig] = digi -> GetfFitParamMY() * digi -> GetfFirstPointZ() + digi -> GetfFitParamNY();
@@ -208,34 +217,44 @@ void Analysis(Int_t run_number, Bool_t verbose = kFALSE){
       }
 
       for (Int_t i = 0; i < minimumEntriesRead; i++){
-        Double_t minimumXSub = 10000;
-        Double_t minimumYSub = 10000;
+        Double_t minimumXSub = 1000000;
+        Double_t minimumYSub = 1000000;
+        Double_t defaultMinimalDistance = 10000;
+        Double_t minimalDistance = defaultMinimalDistance;
 
         Int_t minimumTOFNum = 10000;
         Int_t minimumTrackNum = 10000;
 
+        Double_t minimalTackXCalculated = 0;
+        Double_t minimalTackYCalculated = 0;
+
         for (Int_t iTOF = 0; iTOF < entriesReadTOF; iTOF++){
           for (Int_t iTrack = 0; iTrack < entriesReadTrack; iTrack++){
-            if(xTOFTemp[iTOF] != NULL && xTrackTemp[iTrack] != NULL){
+            if(xTOFTemp[iTOF] != NULL && xTrackTemp[iTrack] != NULL && plane[iTOF] == 0){
               Double_t x = xTOFTemp[iTOF] - xTrackTemp[iTrack];
               Double_t y = yTOFTemp[iTOF] - yTrackTemp[iTrack];
+              // Double_t x = xTOFTemp[iTOF] - (Mx[iTrack] * Z[plane[iTOF]] + Nx[iTrack]);
+              // Double_t y = yTOFTemp[iTOF] - (My[iTrack] * Z[plane[iTOF]] + Ny[iTrack]);
               
               Double_t distance = TMath::Sqrt(x * x + y * y);
-
-              Double_t minimalDistance = TMath::Sqrt(minimumXSub * minimumXSub + minimumYSub * minimumYSub);
 
               if (distance < minimalDistance){
                 minimumXSub = x;
                 minimumYSub = y;
 
+                minimalDistance = TMath::Sqrt(minimumXSub * minimumXSub + minimumYSub * minimumYSub);
+
                 minimumTOFNum = iTOF;
                 minimumTrackNum = iTrack;
+
+                minimalTackXCalculated = Mx[iTrack] * Z[plane[iTOF]] + Nx[iTrack];
+                minimalTackYCalculated = My[iTrack] * Z[plane[iTOF]] + Ny[iTrack];
               }
             }
           }
         }
 
-        if(minimumXSub != 10000){
+        if(minimalDistance != defaultMinimalDistance){
           xSub[pointsTotal] = minimumXSub;
           ySub[pointsTotal] = minimumYSub;
 
@@ -243,13 +262,17 @@ void Analysis(Int_t run_number, Bool_t verbose = kFALSE){
           yTOF[pointsTotal] = yTOFTemp[minimumTOFNum];
           xTrack[pointsTotal] = xTrackTemp[minimumTrackNum];
           yTrack[pointsTotal] = yTrackTemp[minimumTrackNum];
+          // xTrack[pointsTotal] = minimalTackXCalculated;
+          // yTrack[pointsTotal] = minimalTackYCalculated;
 
           if (verbose){
             cout << "Calculation of the differences" << endl;
             cout << "Sub_x = " << xSub[pointsTotal] << "\t Sub_y = " << ySub[pointsTotal] << endl;
             cout << "TOF_x = " << xTOFTemp[minimumTOFNum] << "\t Tof_y = " << yTOFTemp[minimumTOFNum] << endl;
             cout << "TOF_x_Num = " << minimumTOFNum << "\t Tof_y_Num = " << minimumTOFNum << endl;
-            cout << "Track_x = " << xTrackTemp[minimumTrackNum] << "\t Track_y = " << yTrackTemp[minimumTrackNum] << endl;
+            cout << "Track_x = " << minimalTackXCalculated << "\t Track_y = " << minimalTackYCalculated << endl;
+            cout << "Mx = " << Mx[minimumTrackNum] << "\t My = " <<  My[minimumTrackNum] << endl;
+            cout << "Nx = " << Nx[minimumTrackNum] << "\t Ny = " <<  Ny[minimumTrackNum] << endl;
             cout << "Track_x_Num = " << minimumTrackNum << "\t Track_y_Num = " << minimumTrackNum << endl;
 
             getchar();
@@ -276,16 +299,16 @@ void Analysis(Int_t run_number, Bool_t verbose = kFALSE){
   cout << "xMinimum: " << xMinimum << endl;
   //cout << "Points Total: " << pointsTotal << endl;
 
-  // auto* hSubX = new TH1D("hsubx", "Sub X Histo", 100, xMinimum, xMaximum);
-  auto* hSubX = new TH1D("hsubx", "Sub X Histo", 100, 100, 300);
+  auto* hSubX = new TH1D("hsubx", "Sub X Histo", 100, xMinimum, xMaximum);
+  // auto* hSubX = new TH1D("hsubx", "Sub X Histo", 100, 100, 300);
   hSubX -> SetFillColor(30);
   //hSubX -> SetFillStyle(4050);
   auto* hSubXSimulated = new TH1D("hsubxsim", "Sub X Histo Simulated", 100, xMinimum, xMaximum);
   hSubXSimulated -> SetFillColor(46);
   hSubXSimulated -> SetFillStyle(3001);
 
-  // auto* hSubY = new TH1D("hsuby", "Sub Y Histo", 100, yMinimum, yMaximum);
-  auto* hSubY = new TH1D("hsuby", "Sub Y Histo", 100, -100, 20);
+  auto* hSubY = new TH1D("hsuby", "Sub Y Histo", 100, yMinimum, yMaximum);
+  // auto* hSubY = new TH1D("hsuby", "Sub Y Histo", 100, -100, 20);
   hSubY -> SetFillColor(30);
   //hSubY -> SetFillStyle(4050);
   auto* hSubYSimulated = new TH1D("hsubysim", "Sub Y Histo Simulated", 100, yMinimum, yMaximum);
@@ -294,8 +317,8 @@ void Analysis(Int_t run_number, Bool_t verbose = kFALSE){
 
   auto* hTrackX = new TH1D("hTrackx", "Track X Histo", 100, FindMinimum(pointsTotal, xTrack, pointsTotal / 2, pointsTotal), FindMaximum(pointsTotal, xTrack, pointsTotal / 2, pointsTotal));
   auto* hTrackY = new TH1D("hTracky", "Track Y Histo", 100, FindMinimum(pointsTotal, yTrack, pointsTotal / 2, pointsTotal), FindMaximum(pointsTotal, yTrack, pointsTotal / 2, pointsTotal));
-  // auto* hTrackX = new TH1D("hTrackx", "Track X Histo", 100, -640, -580);
-  // auto* hTrackY = new TH1D("hTracky", "Track Y Histo", 100, 0, 350);
+  // auto* hTrackX = new TH1D("hTrackx", "Track X Histo", 100, -2, 2);
+  // auto* hTrackY = new TH1D("hTracky", "Track Y Histo", 100, -10, 20);
   hTrackX -> SetFillColor(30);
   hTrackY -> SetFillColor(30);
   
@@ -356,8 +379,8 @@ void Analysis(Int_t run_number, Bool_t verbose = kFALSE){
   Double_t fySigma = fy -> GetParameter(2);
 
   for (Int_t i = pointsTotal / 2; i < pointsTotal; i++){
-    Double_t SubXSimulated = random -> Gaus(fxMean, fxSigma);
-    Double_t SubYSimulated = random -> Gaus(fyMean, fySigma);
+    Double_t SubXSimulated = fx -> GetRandom();
+    Double_t SubYSimulated = fy -> GetRandom();
 
     hSubXSimulated -> Fill(SubXSimulated);
     hSubYSimulated -> Fill(SubYSimulated);
@@ -378,15 +401,36 @@ void Analysis(Int_t run_number, Bool_t verbose = kFALSE){
   hTOFX -> SetFillColor(30);
   hTOFY -> SetFillColor(30);
   
+  // TImage *image = TImage::Create();
+  // image -> FromPad(c);
+  // //Saving TOF canvas
+  // xPad -> cd();
+  // hTOFX -> Draw();
+  // yPad -> cd();
+  // hTOFY -> Draw();
+  // c -> Modified();
+  // c -> Update();
+  // image -> WriteImage("TOF.png");
+
+  // getchar();
+
+  //Saving Track canvas
+  xPad -> cd();
+  hTrackX -> Draw();
+  yPad -> cd();
+  hTrackY -> Draw();
+  c -> Update();
+  //image -> WriteImage("Track.png");
+
+  getchar();
+
   xPad -> cd();
   hSubX -> Draw();
   hSubXSimulated -> Draw("SAME");
-  hTrackX -> Draw();
 
   yPad -> cd();
   hSubY -> Draw();
   hSubYSimulated -> Draw("SAME");
-  hTrackY -> Draw();
 
   c -> Modified();
   c -> Update();
